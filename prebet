@@ -1,0 +1,66 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+import sys
+import os
+
+# Vérification du fichier CSV
+DATA_FILE = "matchs.csv"
+if not os.path.exists(DATA_FILE):
+    print(f"Erreur : le fichier '{DATA_FILE}' est introuvable.")
+    print("Veuillez ajouter un fichier CSV avec les colonnes : HomeTeam, AwayTeam, HomeGoals, AwayGoals")
+    sys.exit(1)
+
+# Chargement des données
+try:
+    df = pd.read_csv(DATA_FILE)
+except Exception as e:
+    print(f"Erreur lors du chargement du fichier CSV : {e}")
+    sys.exit(1)
+
+# Validation des colonnes nécessaires
+required_cols = {"HomeTeam", "AwayTeam", "HomeGoals", "AwayGoals"}
+if not required_cols.issubset(df.columns):
+    print(f"Erreur : le fichier doit contenir les colonnes {required_cols}")
+    sys.exit(1)
+
+# Création de la colonne 'Result' : 1 = victoire domicile, 0 = nul, -1 = victoire extérieur
+df["Result"] = df.apply(lambda row: 1 if row["HomeGoals"] > row["AwayGoals"]
+                        else (-1 if row["HomeGoals"] < row["AwayGoals"] else 0), axis=1)
+
+# Encodage des équipes en nombres
+teams = list(set(df["HomeTeam"]).union(set(df["AwayTeam"])))
+team_to_num = {team: i for i, team in enumerate(teams)}
+df["HomeTeam"] = df["HomeTeam"].map(team_to_num)
+df["AwayTeam"] = df["AwayTeam"].map(team_to_num)
+
+# Séparation des données
+X = df[["HomeTeam", "AwayTeam"]]
+y = df["Result"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Modèle Random Forest
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Évaluation
+y_pred = model.predict(X_test)
+print(f"Précision du modèle : {accuracy_score(y_test, y_pred) * 100:.2f}%")
+
+# Exemple de prédiction
+def predict_match(home, away):
+    if home not in team_to_num or away not in team_to_num:
+        print("Erreur : équipe inconnue.")
+        return
+    pred = model.predict([[team_to_num[home], team_to_num[away]]])[0]
+    if pred == 1:
+        print(f"Prédiction : {home} gagne")
+    elif pred == -1:
+        print(f"Prédiction : {away} gagne")
+    else:
+        print("Prédiction : Match nul")
+
+# Exemple d'utilisation
+predict_match("Real Madrid", "Barcelona")
